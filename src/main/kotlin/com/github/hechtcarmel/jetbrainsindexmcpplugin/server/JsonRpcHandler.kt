@@ -8,12 +8,11 @@ import com.github.hechtcarmel.jetbrainsindexmcpplugin.handlers.OptimizedSymbolSe
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.history.CommandEntry
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.history.CommandHistoryService
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.history.CommandStatus
-import com.github.hechtcarmel.jetbrainsindexmcpplugin.server.BuildDiagnosticsCacheService
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.server.models.*
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.tools.models.FileMatch
+import com.github.hechtcarmel.jetbrainsindexmcpplugin.tools.ToolRegistry
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.util.ProjectUtils
 import com.github.hechtcarmel.jetbrainsindexmcpplugin.util.TestResultsCollector
-import com.github.hechtcarmel.jetbrainsindexmcpplugin.tools.ToolRegistry
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.logger
@@ -262,8 +261,11 @@ class JsonRpcHandler @JvmOverloads constructor(
         val name = params["name"]?.jsonPrimitive?.contentOrNull
             ?: return createErrorResponse(request.id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing required parameter: name")
         val arguments = params["arguments"]?.jsonObject ?: JsonObject(emptyMap())
+        if (promptDefinitions().none { it.name == name }) {
+            return createErrorResponse(request.id, JsonRpcErrorCodes.METHOD_NOT_FOUND, "Prompt not found: $name")
+        }
         val prompt = buildPrompt(name, arguments)
-            ?: return createErrorResponse(request.id, JsonRpcErrorCodes.METHOD_NOT_FOUND, "Prompt not found: $name")
+            ?: return createErrorResponse(request.id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing required prompt argument for: $name")
 
         return JsonRpcResponse(
             id = request.id,
@@ -594,26 +596,28 @@ class JsonRpcHandler @JvmOverloads constructor(
     }
 
     private fun collectProjectFiles(project: Project, prefix: String, limit: Int): List<FileMatch> {
-        val files = mutableListOf<FileMatch>()
-        runCatching {
-            val fileIndex = ProjectFileIndex.getInstance(project)
-            fileIndex.iterateContent { virtualFile ->
-                if (!virtualFile.isDirectory && files.size < limit) {
-                    val path = ProjectUtils.getRelativePath(project, virtualFile)
-                    if (prefix.isBlank() || path.startsWith(prefix, ignoreCase = true) || virtualFile.name.startsWith(prefix, ignoreCase = true)) {
-                        files += FileMatch(
-                            name = virtualFile.name,
-                            path = path,
-                            directory = virtualFile.parent?.let { ProjectUtils.getRelativePath(project, it) }.orEmpty()
-                        )
+        return runCatching {
+            ReadAction.compute<List<FileMatch>, RuntimeException> {
+                val files = mutableListOf<FileMatch>()
+                val fileIndex = ProjectFileIndex.getInstance(project)
+                fileIndex.iterateContent { virtualFile ->
+                    if (!virtualFile.isDirectory && files.size < limit) {
+                        val path = ProjectUtils.getRelativePath(project, virtualFile)
+                        if (prefix.isBlank() || path.startsWith(prefix, ignoreCase = true) || virtualFile.name.startsWith(prefix, ignoreCase = true)) {
+                            files += FileMatch(
+                                name = virtualFile.name,
+                                path = path,
+                                directory = virtualFile.parent?.let { ProjectUtils.getRelativePath(project, it) }.orEmpty()
+                            )
+                        }
                     }
+                    files.size < limit
                 }
-                files.size < limit
+                files
             }
         }.onFailure {
             LOG.debug("Failed to collect project files for ${project.name}", it)
-        }
-        return files
+        }.getOrDefault(emptyList())
     }
 
     private fun resolveProjectVirtualFile(project: Project, filePath: String) =
