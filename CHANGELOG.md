@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-05-01
+### Added
+- Added MCP support for resources, resource templates, prompts, completion, logging level updates, and safe handling for known client notifications.
+
 ## [4.17.0] - 2026-05-01
 ### Added
 - Added Rider C# and F# language handlers for hierarchy, implementation, call hierarchy, super-method, and file-structure tools using Rider's frontend navigation bridge to the ReSharper backend.

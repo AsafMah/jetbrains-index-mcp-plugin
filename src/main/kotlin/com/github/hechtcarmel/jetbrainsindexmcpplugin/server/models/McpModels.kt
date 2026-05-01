@@ -44,11 +44,26 @@ data class ServerInfo(
 
 @Serializable
 data class ServerCapabilities(
-    val tools: ToolCapability? = ToolCapability()
+    val tools: ToolCapability? = ToolCapability(),
+    val resources: ResourceCapability? = ResourceCapability(),
+    val prompts: PromptCapability? = PromptCapability(),
+    val completions: JsonObject = JsonObject(emptyMap()),
+    val logging: JsonObject = JsonObject(emptyMap())
 )
 
 @Serializable
 data class ToolCapability(
+    val listChanged: Boolean = false
+)
+
+@Serializable
+data class ResourceCapability(
+    val subscribe: Boolean = false,
+    val listChanged: Boolean = false
+)
+
+@Serializable
+data class PromptCapability(
     val listChanged: Boolean = false
 )
 
@@ -68,4 +83,85 @@ data class ToolsListResult(
 data class ToolCallParams(
     val name: String,
     val arguments: JsonObject? = null
+)
+
+@Serializable
+data class ResourceDefinition(
+    val uri: String,
+    val name: String,
+    val description: String? = null,
+    val mimeType: String? = null
+)
+
+@Serializable
+data class ResourcesListResult(
+    val resources: List<ResourceDefinition>
+)
+
+@Serializable
+data class ResourceTemplateDefinition(
+    val uriTemplate: String,
+    val name: String,
+    val description: String? = null,
+    val mimeType: String? = null
+)
+
+@Serializable
+data class ResourceTemplatesListResult(
+    val resourceTemplates: List<ResourceTemplateDefinition>
+)
+
+@Serializable
+data class ResourceReadResult(
+    val contents: List<ResourceContent>
+)
+
+@Serializable
+data class ResourceContent(
+    val uri: String,
+    val mimeType: String,
+    val text: String
+)
+
+@Serializable
+data class PromptDefinition(
+    val name: String,
+    val description: String? = null,
+    val arguments: List<PromptArgumentDefinition> = emptyList()
+)
+
+@Serializable
+data class PromptArgumentDefinition(
+    val name: String,
+    val description: String? = null,
+    val required: Boolean = false
+)
+
+@Serializable
+data class PromptsListResult(
+    val prompts: List<PromptDefinition>
+)
+
+@Serializable
+data class PromptGetResult(
+    val description: String? = null,
+    val messages: List<PromptMessage>
+)
+
+@Serializable
+data class PromptMessage(
+    val role: String,
+    val content: ContentBlock
+)
+
+@Serializable
+data class CompletionResult(
+    val completion: CompletionValues
+)
+
+@Serializable
+data class CompletionValues(
+    val values: List<String>,
+    val total: Int? = null,
+    val hasMore: Boolean = false
 )
